@@ -1,0 +1,75 @@
+<% if @ssl %>
+server {
+  listen 80;
+
+  server_name <%= @fqdn %>;
+
+  location / {
+    return 301 https://<%= @fqdn %>$request_uri;
+  }
+}
+<% end %>
+
+server {
+  <% if @ssl %>
+  listen 443 ssl http2;
+  <% else %>
+  listen 80;
+  <% end %>
+  server_name <%= @fqdn %>;
+
+  <% if @ssl %>
+  <% if @scts %>
+  ssl_ct on;
+  <% end %>
+
+  ssl_certificate <%= @ssl_rsa_certificate %>;
+  ssl_certificate_key <%= @ssl_rsa_certificate_key %>;
+  <% if @scts %>
+  ssl_ct_static_scts <%= @scts_rsa_dir %>;
+  <% end %>
+
+  <% if @use_ec_certificate %>
+  ssl_certificate <%= @ssl_ec_certificate %>;
+  ssl_certificate_key <%= @ssl_ec_certificate_key %>;
+  <% if @scts %>
+  ssl_ct_static_scts <%= @scts_ec_dir %>;
+  <% end %>
+  <% end %>
+
+  more_set_headers 'Strict-Transport-Security: max-age=<%= @hsts_max_age %>';
+  more_set_headers 'X-Frame-Options: DENY';
+
+  <% if @oscp_stapling %>
+  ssl_stapling on;
+  ssl_stapling_verify on;
+  resolver 8.8.8.8 8.8.4.4 valid=300s;
+  <% end %>
+
+  <% if @hpkp && @hpkp_pins.size > 0 %>
+  more_set_headers 'Public-Key-Pins: <%= @hpkp_pins.map{ |pin| "pin-sha256=\"#{pin}\"" }.join '; ' %>; max-age=<%= @hpkp_max_age %>;';
+  <% end %>
+  <% end %>
+
+  access_log <%= @access_log %>;
+  error_log <%= @error_log %> error;
+
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $remote_addr;
+  proxy_redirect off;
+
+  proxy_read_timeout 5s;
+  proxy_send_timeout 5s;
+  send_timeout 5s;
+  resolver_timeout 5s;
+  client_body_timeout 5s;
+
+  client_max_body_size 5m;
+  client_body_buffer_size 100k;
+
+  location / {
+    include uwsgi_params;
+    uwsgi_pass <%= @sentry_host %>:<%= @sentry_port %>;
+  }
+}
