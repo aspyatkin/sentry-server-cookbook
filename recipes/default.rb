@@ -26,6 +26,7 @@ end
 virtualenv_path = ::File.join(basedir, '.venv')
 
 python_virtualenv virtualenv_path do
+  python '2'
   user instance.user
   group instance.group
   action :create
@@ -73,9 +74,6 @@ postgresql_database_user 'sentry_user' do
   action [:create, :grant]
 end
 
-
-
-
 conf_file = ::File.join(basedir, 'sentry.conf.py')
 
 template conf_file do
@@ -98,6 +96,7 @@ template conf_file do
     redis_db: 1,
     ssl: node[id]['security']['ssl']
   )
+  sensitive true
   mode 0644
 end
 
@@ -130,6 +129,7 @@ template new_conf_file do
     smtp_tls: secret.get('sentry:smtp:tls'),
     smtp_from: secret.get('sentry:smtp:from')
   )
+  sensitive true
 end
 
 new_conf_file_checksum = ::Digest::SHA256.file(new_conf_file).hexdigest
@@ -434,5 +434,83 @@ node[id]['config']['entities'].each do |organization_name, organization_data|
         action :run
       end
     end
+  end
+end
+
+script_dir = ::File.join(basedir, 'scripts')
+
+directory script_dir do
+  owner instance.user
+  group instance.group
+  mode 0755
+  recursive true
+  action :create
+end
+
+cleanup_script_filepath = ::File.join(script_dir, 'cleanup')
+cleanup_enabled = node[id]['cleanup']['enabled']
+
+template cleanup_script_filepath do
+  source 'cleanup.sh.erb'
+  owner instance.user
+  group instance.group
+  mode 0755
+  variables(
+    target_user: instance.user,
+    virtualenv_path: virtualenv_path,
+    sentry_conf_dir: basedir,
+    sentry_cleanup_days: node[id]['cleanup']['days']
+  )
+  if cleanup_enabled
+    action :create
+  else
+    action :delete
+  end
+end
+
+cron 'sentry_cleanup' do
+  unless node[id]['cleanup']['cron']['mailto'].nil? && node[id]['cleanup']['cron']['mailfrom'].nil?
+    command %Q(#{cleanup_script_filepath} 2>&1 | mail -s "Cron sentry_cleanup" -a "From: #{node[id]['cleanup']['cron']['mailfrom']}" #{node[id]['cleanup']['cron']['mailto']})
+  else
+    command "#{cleanup_script_filepath}"
+  end
+  minute node[id]['cleanup']['cron']['minute']
+  hour node[id]['cleanup']['cron']['hour']
+  day node[id]['cleanup']['cron']['day']
+  month node[id]['cleanup']['cron']['month']
+  weekday node[id]['cleanup']['cron']['weekday']
+
+  if cleanup_enabled
+    action :create
+  else
+    action :delete
+  end
+end
+
+backup_enabled = node[id]['backup']['enabled']
+
+s3backup_postgres_database 'sentry_database' do
+  db_host '127.0.0.1'
+  db_port 5432
+  db_name 'sentry_db'
+  db_username 'sentry_user'
+  db_password secret.get('postgres:password:sentry_user')
+  aws_iam_access_key_id secret.get("aws:iam:#{node[id]['backup']['aws']['iam']['account_alias']}:access_key_id")
+  aws_iam_secret_access_key secret.get("aws:iam:#{node[id]['backup']['aws']['iam']['account_alias']}:secret_access_key")
+  aws_s3_bucket_region node[id]['backup']['aws']['s3']['bucket_region']
+  aws_s3_bucket_name node[id]['backup']['aws']['s3']['bucket_name']
+  schedule(
+    mailto: node[id]['backup']['cron']['mailto'],
+    mailfrom: node[id]['backup']['cron']['mailfrom'],
+    minute: node[id]['backup']['cron']['minute'],
+    hour: node[id]['backup']['cron']['hour'],
+    day: node[id]['backup']['cron']['day'],
+    month: node[id]['backup']['cron']['month'],
+    weekday: node[id]['backup']['cron']['weekday']
+  )
+  if backup_enabled
+    action :create
+  else
+    action :delete
   end
 end

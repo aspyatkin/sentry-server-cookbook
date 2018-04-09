@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+target_user=${TARGET_USER:-"<%= @target_user %>"}
+if [ "$(whoami)" != "$target_user" ]; then
+  exec sudo -u "$target_user" -- "$0" "$@"
+fi
+
+. <%= @virtualenv_path %>/bin/activate
+SENTRY_CONF=<%= @sentry_conf_dir %> sentry cleanup --loglevel=WARNING --days=<%= @sentry_cleanup_days %>
+RETVAL=$?
+deactivate
+exit $RETVAL
