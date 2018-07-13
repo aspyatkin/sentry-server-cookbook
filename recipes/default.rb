@@ -468,12 +468,22 @@ template cleanup_script_filepath do
   end
 end
 
-cron 'sentry_cleanup' do
-  unless node[id]['cleanup']['cron']['mailto'].nil? && node[id]['cleanup']['cron']['mailfrom'].nil?
-    command %Q(#{cleanup_script_filepath} 2>&1 | mail -s "Cron sentry_cleanup" -a "From: #{node[id]['cleanup']['cron']['mailfrom']}" #{node[id]['cleanup']['cron']['mailto']})
-  else
-    command "#{cleanup_script_filepath}"
+sentry_cleanup_command = nil
+
+ruby_block 'construct sentry_cleanup command' do
+  block do
+    ssmtp_h = ::ChefCookbook::BetterSSMTP::Helper.new(node)
+    sentry_cleanup_command = "#{node.run_state['cronic_installed'] ? "#{node.run_state['cronic_command']} " : ''}#{cleanup_script_filepath}"
+
+    unless node[id]['cleanup']['cron']['mailto'].nil? && node[id]['cleanup']['cron']['mailfrom'].nil?
+      sentry_cleanup_command += " 2>&1 | #{ssmtp_h.mail_send_command('Cron sentry_cleanup', node[id]['cleanup']['cron']['mailfrom'], node[id]['cleanup']['cron']['mailto'], node.run_state['cronic_installed'])}"
+    end
   end
+  action :run
+end
+
+cron 'sentry_cleanup' do
+  command lazy { sentry_cleanup_command }
   minute node[id]['cleanup']['cron']['minute']
   hour node[id]['cleanup']['cron']['hour']
   day node[id]['cleanup']['cron']['day']
