@@ -100,7 +100,13 @@ template conf_file do
   mode 0644
 end
 
-conf_file_checksum = ::Digest::SHA256.file(conf_file).hexdigest
+conf_file_checksum = nil
+
+ruby_block 'calculate Sentry conf file checksum' do
+  block do
+    conf_file_checksum = ::Digest::SHA256.file(conf_file).hexdigest
+  end
+end
 
 new_conf_file = ::File.join(basedir, 'config.yml')
 
@@ -132,7 +138,13 @@ template new_conf_file do
   sensitive true
 end
 
-new_conf_file_checksum = ::Digest::SHA256.file(new_conf_file).hexdigest
+new_conf_file_checksum = nil
+
+ruby_block 'calculate Sentry new conf file checksum' do
+  block do
+    new_conf_file_checksum = ::Digest::SHA256.file(new_conf_file).hexdigest
+  end
+end
 
 python_execute 'Run Sentry database migration' do
   command '-m sentry upgrade --noinput'
@@ -174,12 +186,14 @@ supervisor_service "#{namespace}.web" do
   stderr_logfile_backups 10
   stderr_capture_maxbytes '0'
   stderr_events_enabled false
-  environment(
-    'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
-    'SENTRY_CONF' => basedir,
-    'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
-    'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
-  )
+  environment(lazy {
+    {
+      'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
+      'SENTRY_CONF' => basedir,
+      'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
+      'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
+    }
+  })
   directory basedir
   serverurl 'AUTO'
   action :enable
@@ -212,12 +226,14 @@ supervisor_service "#{namespace}.worker" do
   stderr_logfile_backups 10
   stderr_capture_maxbytes '0'
   stderr_events_enabled false
-  environment(
-    'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
-    'SENTRY_CONF' => basedir,
-    'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
-    'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
-  )
+  environment(lazy {
+    {
+      'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
+      'SENTRY_CONF' => basedir,
+      'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
+      'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
+    }
+  })
   directory basedir
   serverurl 'AUTO'
   action :enable
@@ -250,12 +266,14 @@ supervisor_service "#{namespace}.cron" do
   stderr_logfile_backups 10
   stderr_capture_maxbytes '0'
   stderr_events_enabled false
-  environment(
-    'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
-    'SENTRY_CONF' => basedir,
-    'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
-    'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
-  )
+  environment(lazy {
+    {
+      'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
+      'SENTRY_CONF' => basedir,
+      'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
+      'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
+    }
+  })
   directory basedir
   serverurl 'AUTO'
   action :enable
