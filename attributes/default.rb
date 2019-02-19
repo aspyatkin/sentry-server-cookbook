@@ -1,6 +1,7 @@
 id = 'sentry-server'
 
 default[id]['fqdn'] = nil
+default[id]['version'] = '9.0.0'
 
 default[id]['security']['ssl'] = false
 default[id]['security']['use_ec_certificate'] = false

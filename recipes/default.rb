@@ -34,10 +34,13 @@ end
 
 requirements_file = ::File.join(basedir, 'requirements.txt')
 
-cookbook_file requirements_file do
-  source 'requirements.txt'
+template requirements_file do
+  source 'requirements.txt.erb'
   owner instance.user
   group instance.group
+  variables(
+    version: node[id]['version']
+  )
   mode 0644
   action :create
 end
@@ -48,7 +51,6 @@ pip_requirements requirements_file do
   virtualenv virtualenv_path
   action :install
 end
-
 
 include_recipe 'database::postgresql'
 
@@ -190,6 +192,7 @@ supervisor_service "#{namespace}.web" do
     {
       'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
       'SENTRY_CONF' => basedir,
+      '_SENTRY_VERSION' => node[id]['version'],
       'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
       'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
     }
@@ -230,6 +233,7 @@ supervisor_service "#{namespace}.worker" do
     {
       'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
       'SENTRY_CONF' => basedir,
+      '_SENTRY_VERSION' => node[id]['version'],
       'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
       'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
     }
@@ -270,6 +274,7 @@ supervisor_service "#{namespace}.cron" do
     {
       'PATH' => "#{::File.join(virtualenv_path, 'bin')}:%(ENV_PATH)s",
       'SENTRY_CONF' => basedir,
+      '_SENTRY_VERSION' => node[id]['version'],
       'INTERNAL_SENTRY_CONF_FILE_CHECKSUM' => conf_file_checksum,
       'INTERNAL_SENTRY_NEW_CONF_FILE_CHECKSUM' => new_conf_file_checksum
     }
@@ -294,7 +299,7 @@ ngx_vhost_variables = {
   error_log: ::File.join(node['nginx']['log_dir'], 'sentry_error.log'),
   sentry_host: '127.0.0.1',
   sentry_port: 9000,
-  ssl: node[id]['security']['ssl'],
+  ssl: node[id]['security']['ssl']
 }
 
 if node[id]['security']['ssl']
@@ -346,8 +351,11 @@ end
 
 cli_script = ::File.join(basedir, 'cli.py')
 
+require 'versionomy'
+cli_script_version = ::Versionomy.parse(node[id]['version']).major
+
 cookbook_file cli_script do
-  source 'sentry_cli.py'
+  source "sentry_cli_#{cli_script_version}.py"
   owner instance.user
   group instance.group
   mode 0644

@@ -1,3 +1,7 @@
+# Sentry CLI script
+# Compatible with Sentry 9.x
+# Copyright (c) 2019 Alexander Pyatkin
+
 import os
 import sys
 import click
@@ -11,7 +15,8 @@ from sentry.models import (
     OrganizationMember,
     Team,
     OrganizationMemberTeam,
-    Project
+    Project,
+    ProjectTeam
 )
 
 
@@ -120,7 +125,7 @@ def sentry_update_team_member(team, organization_member):
 def sentry_find_project(team, name):
     records = Project.objects.filter(
         name=name,
-        team_id=team.id,
+        teams__id=team.id,
         organization_id=team.organization.id
     )
     if len(records) > 0:
@@ -133,9 +138,12 @@ def sentry_create_project(team, name):
     if not existing:
         model = Project()
         model.name = name
-        model.team = team
         model.organization = team.organization
         model.save()
+        model2 = ProjectTeam()
+        model2.project = model
+        model2.team = team
+        model2.save()
 
     return model, existing
 

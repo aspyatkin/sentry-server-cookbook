@@ -2,7 +2,7 @@ name 'sentry-server'
 maintainer 'Alexander Pyatkin'
 maintainer_email 'aspyatkin@gmail.com'
 license 'MIT'
-version '0.4.1'
+version '0.5.0'
 description 'Installs and configures Sentry server'
 
 recipe 'sentry-server::default', 'Installs and configures Sentry server'
@@ -21,5 +21,7 @@ depends 'nginx'
 depends 'tls', '~> 3.0.2'
 depends 's3backup', '~> 1.0.0'
 depends 'better-ssmtp', '~> 1.1.0'
+
+gem 'versionomy'
 
 supports 'ubuntu'
