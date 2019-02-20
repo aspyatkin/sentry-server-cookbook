@@ -2,7 +2,7 @@ name 'sentry-server'
 maintainer 'Alexander Pyatkin'
 maintainer_email 'aspyatkin@gmail.com'
 license 'MIT'
-version '0.5.0'
+version '0.5.1'
 description 'Installs and configures Sentry server'
 
 recipe 'sentry-server::default', 'Installs and configures Sentry server'

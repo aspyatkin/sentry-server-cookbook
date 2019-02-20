@@ -5,7 +5,7 @@ if [ "$(whoami)" != "$target_user" ]; then
 fi
 
 . <%= @virtualenv_path %>/bin/activate
-SENTRY_CONF=<%= @sentry_conf_dir %> sentry cleanup --loglevel=WARNING --days=<%= @sentry_cleanup_days %>
+SENTRY_CONF=<%= @sentry_conf_dir %> sentry cleanup --loglevel=WARNING --days=<%= @sentry_cleanup_days %> 2>&1
 RETVAL=$?
 deactivate
 exit $RETVAL
